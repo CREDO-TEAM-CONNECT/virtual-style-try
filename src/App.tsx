@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import TryOn from "./pages/TryOn";
 import Gallery from "./pages/Gallery";
 import Auth from "./pages/Auth";
+import Models from "./pages/Models";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
               <Route path="/try-on" element={<TryOn />} />
               <Route path="/try-on/:productId" element={<TryOn />} />
               <Route path="/gallery" element={<Gallery />} />
+              <Route path="/models" element={<Models />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

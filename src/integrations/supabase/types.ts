@@ -9,6 +9,83 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      model_images: {
+        Row: {
+          created_at: string
+          id: string
+          model_id: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model_id: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model_id?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_images_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      models: {
+        Row: {
+          branch: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          model_type: string
+          name: string
+          status: string
+          title: string
+          token: string | null
+          trained_at: string | null
+          tune_id: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          branch?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          model_type?: string
+          name: string
+          status?: string
+          title: string
+          token?: string | null
+          trained_at?: string | null
+          tune_id?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          branch?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          model_type?: string
+          name?: string
+          status?: string
+          title?: string
+          token?: string | null
+          trained_at?: string | null
+          tune_id?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -35,7 +112,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      update_model_from_callback: {
+        Args: {
+          tune_data: Json
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
 import { Product } from '@/lib/products';
+import { Model } from '@/hooks/useModels';
 import { toast } from 'sonner';
 
 // In a real application, this would be an actual AI-powered try-on service
@@ -9,6 +10,7 @@ import { toast } from 'sonner';
 interface TryOnOptions {
   productId: string;
   userImage?: File;
+  modelId?: string;
   size?: string;
   color?: string;
 }
