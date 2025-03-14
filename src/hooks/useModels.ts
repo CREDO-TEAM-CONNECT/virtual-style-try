@@ -122,19 +122,20 @@ export const useModels = () => {
       // Upload images to storage and create records
       const imageUrls = await Promise.all(
         files.map(async (file, index) => {
-          const filePath = `${user.id}/${modelId}/${index}-${file.name}`;
+          // Fix: Simplified file path structure to avoid nested paths that can cause issues
+          const fileName = `${modelId}_${index}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
           
-          // Upload to storage
+          // Upload to storage with simplified path
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('model_images')
-            .upload(filePath, file);
+            .upload(fileName, file);
           
           if (uploadError) throw uploadError;
           
           // Get public URL
           const { data: publicUrlData } = supabase.storage
             .from('model_images')
-            .getPublicUrl(filePath);
+            .getPublicUrl(fileName);
           
           const imageUrl = publicUrlData.publicUrl;
           
@@ -217,15 +218,18 @@ export const useModels = () => {
       
       if (error) throw error;
       
-      // Delete storage files
+      // Delete storage files - update to match the new file naming pattern
       const { data: files, error: listError } = await supabase.storage
         .from('model_images')
-        .list(`${user.id}/${modelId}`);
+        .list();
       
       if (listError) throw listError;
       
-      if (files?.length > 0) {
-        const filePaths = files.map(file => `${user.id}/${modelId}/${file.name}`);
+      // Find files that start with the modelId
+      const modelFiles = files?.filter(file => file.name.startsWith(`${modelId}_`)) || [];
+      
+      if (modelFiles.length > 0) {
+        const filePaths = modelFiles.map(file => file.name);
         
         const { error: deleteError } = await supabase.storage
           .from('model_images')
