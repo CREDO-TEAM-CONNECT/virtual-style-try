@@ -29,6 +29,16 @@ export interface Model {
   images?: ModelImage[];
 }
 
+type ModelStatus = 'training' | 'completed' | 'failed';
+
+// Helper function to safely cast status to ModelStatus
+const castStatus = (status: string): ModelStatus => {
+  if (status === 'training' || status === 'completed' || status === 'failed') {
+    return status as ModelStatus;
+  }
+  return 'training'; // Default to 'training' if status is not a valid value
+};
+
 export const useModels = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -59,8 +69,9 @@ export const useModels = () => {
           
           return {
             ...model,
+            status: castStatus(model.status), // Cast status to the correct type
             images: imagesData
-          };
+          } as Model; // Explicitly cast to Model type
         })
       );
       
@@ -177,8 +188,9 @@ export const useModels = () => {
       
       const modelWithImages = {
         ...updatedModel,
+        status: castStatus(updatedModel.status), // Cast status to correct type
         images: imagesData
-      };
+      } as Model; // Explicitly cast to Model type
       
       setModels((prev) => [modelWithImages, ...prev]);
       toast.success('Model created successfully and training started');

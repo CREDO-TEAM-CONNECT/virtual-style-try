@@ -36,7 +36,7 @@ serve(async (req) => {
           branch: "fast",
           model_type: "lora",
           image_urls: imageUrls,
-          callback: `${supabaseUrl}/functions/v1/model-callback`, // You'll need to create this function
+          callback: `${supabaseUrl}/functions/v1/model-callback`,
         },
       }),
     };
@@ -44,14 +44,14 @@ serve(async (req) => {
     const response = await fetch(`${astriaApiDomain}/tunes`, options);
     const data = await response.json();
 
-    // Update model in database with initial response data
+    // Update model in database with initial response data - ensure status is one of the valid enum values
     if (data && data.id) {
       await supabase
         .from("models")
         .update({
           tune_id: data.id,
           token: data.token,
-          status: "training",
+          status: "training", // Explicitly set as string literal
           updated_at: new Date().toISOString(),
         })
         .eq("id", modelData.id);

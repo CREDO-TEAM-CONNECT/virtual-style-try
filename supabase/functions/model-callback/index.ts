@@ -18,11 +18,14 @@ serve(async (req) => {
       });
     }
     
+    // Set status value explicitly to one of the allowed enum values
+    const status = tuneData.trained_at ? "completed" : "training";
+    
     // Update model status in database
     const { data, error } = await supabase
       .from("models")
       .update({
-        status: tuneData.trained_at ? "completed" : "training",
+        status: status,
         token: tuneData.token,
         tune_id: tuneData.id,
         trained_at: tuneData.trained_at,
