@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useGallery } from '@/context/GalleryContext';
-import { Heart, ShoppingBag, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+import UserMenu from './UserMenu';
 
 const Navbar = () => {
   const location = useLocation();
@@ -67,6 +68,11 @@ const Navbar = () => {
           </NavLink>
         </nav>
         
+        {/* User Menu (Desktop) */}
+        <div className="hidden md:block">
+          <UserMenu />
+        </div>
+        
         {/* Mobile Menu Button */}
         <button 
           className="md:hidden p-2 rounded-full hover:bg-gray-100 transition-colors"
@@ -100,6 +106,9 @@ const Navbar = () => {
                   </span>
                 )}
               </span>
+            </MobileNavLink>
+            <MobileNavLink to="/auth" active={location.pathname === '/auth'}>
+              Sign In / Sign Up
             </MobileNavLink>
           </nav>
         </div>
