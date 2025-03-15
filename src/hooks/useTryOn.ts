@@ -1,56 +1,69 @@
 
 import { useState } from 'react';
-import { Product } from '@/lib/products';
-import { Model } from '@/hooks/useModels';
-import { toast } from 'sonner';
+import { Product } from '@/lib/products'; 
+import { supabase } from '@/integrations/supabase/client';
 
-// In a real application, this would be an actual AI-powered try-on service
-// For this demo, we'll simulate the API call and response
-
-interface TryOnOptions {
-  productId: string;
-  userImage?: File;
-  modelId?: string;
+type TryOnOptions = {
   size?: string;
   color?: string;
-}
+};
 
-interface TryOnResult {
+type TryOnResult = {
   success: boolean;
   imageUrl?: string;
   error?: string;
-}
+};
 
 export const useTryOn = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentResult, setCurrentResult] = useState<TryOnResult | null>(null);
   
-  const generateTryOn = async (product: Product, options: Partial<TryOnOptions> = {}): Promise<TryOnResult> => {
+  // This would call your backend service to generate a try-on image
+  const generateTryOn = async (product: Product, options: TryOnOptions = {}) => {
     setIsLoading(true);
     setCurrentResult(null);
     
     try {
-      // In a real app, this would be an API call to an AI service
-      // For demonstration, we'll simulate a delay and return the product's model image
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log(`Generating try-on for ${product.name}`, options);
       
-      // In a real app, this would be the AI-generated image URL
-      // For this demo, we'll use the model image from the product data
-      const result: TryOnResult = {
+      // Check if this is a user-created product with a tune_id
+      let productWithDetails;
+      if (typeof product.id === 'string' && product.id.includes('-')) {
+        // This looks like a UUID, so it's likely a user-created product
+        // Fetch the product details from Supabase including the tune_id
+        const { data } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', product.id)
+          .single();
+          
+        productWithDetails = data;
+      } else {
+        // Using a built-in product, use the data as-is
+        productWithDetails = product;
+      }
+      
+      // This is a simplified mock of what would be an actual API call
+      // In a real implementation, you would call a backend service
+      
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // For now, just return the product image as a "try-on" result
+      const result = {
         success: true,
-        imageUrl: product.images.model || product.images.main
+        imageUrl: product.images.main,
       };
       
       setCurrentResult(result);
       return result;
     } catch (error) {
-      console.error('Error in try-on process:', error);
-      const errorResult: TryOnResult = {
+      console.error('Error generating try-on:', error);
+      const errorResult = {
         success: false,
         error: 'Failed to generate try-on visualization'
       };
       setCurrentResult(errorResult);
-      toast.error('Failed to generate try-on visualization');
       return errorResult;
     } finally {
       setIsLoading(false);

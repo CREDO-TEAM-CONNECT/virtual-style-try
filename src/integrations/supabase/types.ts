@@ -86,6 +86,86 @@ export type Database = {
         }
         Relationships: []
       }
+      product_images: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          type: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          type: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          type?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_images_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          brand: string
+          category: string
+          color: string[]
+          created_at: string
+          description: string
+          id: string
+          is_public: boolean
+          name: string
+          price: number
+          shop_link: string | null
+          size: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          brand: string
+          category: string
+          color: string[]
+          created_at?: string
+          description: string
+          id?: string
+          is_public?: boolean
+          name: string
+          price: number
+          shop_link?: string | null
+          size: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          brand?: string
+          category?: string
+          color?: string[]
+          created_at?: string
+          description?: string
+          id?: string
+          is_public?: boolean
+          name?: string
+          price?: number
+          shop_link?: string | null
+          size?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

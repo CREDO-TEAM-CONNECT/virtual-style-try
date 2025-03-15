@@ -2,12 +2,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getProductById, products, Product } from '@/lib/products';
+import { useDynamicProducts } from '@/hooks/useDynamicProducts';
 import TryOnCanvas from '@/components/TryOnCanvas';
 import ProductCard from '@/components/ProductCard';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ChevronDown } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { supabase } from '@/integrations/supabase/client';
 
 const TryOn = () => {
   const { productId } = useParams<{ productId: string }>();
@@ -17,31 +19,90 @@ const TryOn = () => {
   const [sizeDropdownOpen, setSizeDropdownOpen] = useState(false);
   const [colorDropdownOpen, setColorDropdownOpen] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const { dynamicProducts } = useDynamicProducts();
   
   // Get product data when ID changes
   useEffect(() => {
-    if (productId) {
-      const foundProduct = getProductById(productId);
-      if (foundProduct) {
-        setProduct(foundProduct);
-        // Set default selections
-        setSelectedSize(foundProduct.size[0]);
-        setSelectedColor(foundProduct.color[0]);
-        
-        // Get related products of the same category
-        const related = products
-          .filter(p => p.category === foundProduct.category && p.id !== foundProduct.id)
-          .slice(0, 3);
-        setRelatedProducts(related);
+    const fetchProduct = async () => {
+      if (!productId) return;
+      
+      // Check if it's a UUID (user-created product)
+      if (productId.includes('-')) {
+        try {
+          // Fetch from database
+          const { data, error } = await supabase
+            .from('products')
+            .select('*, product_images(*)')
+            .eq('id', productId)
+            .single();
+          
+          if (error) throw error;
+          
+          // Transform to match Product interface
+          const mainImage = data.product_images.find((img: any) => img.type === 'main')?.url || '';
+          const additionalImages = data.product_images
+            .filter((img: any) => img.type !== 'main')
+            .map((img: any) => img.url);
+          
+          const userProduct: Product = {
+            id: data.id,
+            name: data.name,
+            brand: data.brand,
+            price: data.price,
+            description: data.description,
+            category: data.category,
+            size: data.size,
+            color: data.color,
+            shopLink: data.shop_link || '',
+            images: {
+              main: mainImage,
+              additional: additionalImages
+            }
+          };
+          
+          setProduct(userProduct);
+          setSelectedSize(userProduct.size[0]);
+          setSelectedColor(userProduct.color[0]);
+          
+          // Get related user-created products
+          const allProducts = [...products, ...dynamicProducts];
+          const related = allProducts
+            .filter(p => p.category === userProduct.category && p.id !== userProduct.id)
+            .slice(0, 3);
+          setRelatedProducts(related);
+        } catch (error) {
+          console.error('Error fetching user product:', error);
+          setProduct(null);
+        }
+      } else {
+        // It's a regular product from static data
+        const foundProduct = getProductById(productId);
+        if (foundProduct) {
+          setProduct(foundProduct);
+          // Set default selections
+          setSelectedSize(foundProduct.size[0]);
+          setSelectedColor(foundProduct.color[0]);
+          
+          // Get related products of the same category
+          const allProducts = [...products, ...dynamicProducts];
+          const related = allProducts
+            .filter(p => p.category === foundProduct.category && p.id !== foundProduct.id)
+            .slice(0, 3);
+          setRelatedProducts(related);
+        } else {
+          setProduct(null);
+        }
       }
-    } else {
-      // If no product ID is specified, show a selection of products
-      setProduct(null);
-    }
-  }, [productId]);
+    };
+    
+    fetchProduct();
+  }, [productId, dynamicProducts]);
   
   // If no product ID is specified, show browsing page
   if (!productId) {
+    // Combine static and dynamic products
+    const allProducts = [...products, ...dynamicProducts];
+    
     return (
       <div className="min-h-screen flex flex-col">
         <Navbar />
@@ -56,7 +117,7 @@ const TryOn = () => {
             </p>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {products.map(product => (
+              {allProducts.map(product => (
                 <div key={product.id} className="animate-scale-in">
                   <ProductCard product={product} />
                 </div>
