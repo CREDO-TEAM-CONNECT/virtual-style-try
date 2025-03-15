@@ -10,9 +10,6 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import TryOnCanvas from '@/components/TryOnCanvas';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { toast } from 'sonner';
 
 const TryOn = () => {

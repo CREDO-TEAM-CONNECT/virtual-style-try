@@ -99,6 +99,11 @@ export const useProducts = () => {
     
     setIsLoading(true);
     try {
+      // Validate category to ensure it matches the database constraints
+      if (!['shirts', 'pants', 'coats', 'dresses', 'shoes', 'hats', 'accessories', 'swimwear'].includes(productData.category)) {
+        throw new Error('Invalid category selected');
+      }
+      
       // Create product record first
       const productId = uuidv4();
       const { data: product, error: productError } = await supabase
@@ -168,7 +173,7 @@ export const useProducts = () => {
         });
         
         if (!response.ok) {
-          console.warn('Warning: Fine-tuning may not have initiated properly');
+          console.warn('Warning: Fine-tuning may not have initiated properly', await response.text());
         }
       }
       
@@ -210,6 +215,11 @@ export const useProducts = () => {
     
     setIsLoading(true);
     try {
+      // Validate category if it's being updated
+      if (updates.category && !['shirts', 'pants', 'coats', 'dresses', 'shoes', 'hats', 'accessories', 'swimwear'].includes(updates.category)) {
+        throw new Error('Invalid category selected');
+      }
+      
       const { data, error } = await supabase
         .from('products')
         .update({

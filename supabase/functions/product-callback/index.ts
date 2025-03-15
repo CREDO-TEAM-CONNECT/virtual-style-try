@@ -4,6 +4,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
 serve(async (req) => {
   try {
+    // CORS headers for browser requests
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      'Content-Type': 'application/json'
+    };
+
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
+    }
+
     // Parse the callback data from Astria
     const tuneData = await req.json();
     console.log("Received product tune callback:", tuneData);
@@ -43,13 +55,20 @@ serve(async (req) => {
     }
     
     return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json" },
+      headers: corsHeaders,
       status: 200,
     });
   } catch (error) {
     console.error("Error in product-callback function:", error);
+    
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      'Content-Type': 'application/json'
+    };
+    
     return new Response(JSON.stringify({ error: error.message }), {
-      headers: { "Content-Type": "application/json" },
+      headers: corsHeaders,
       status: 500,
     });
   }

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,7 +31,7 @@ const productSchema = z.object({
   description: z.string().min(10, 'Description must be at least 10 characters'),
   brand: z.string().min(1, 'Brand is required'),
   price: z.coerce.number().positive('Price must be a positive number'),
-  category: z.string().min(1, 'Category is required'),
+  category: z.enum(['shirts', 'pants', 'coats', 'dresses', 'shoes', 'hats', 'accessories', 'swimwear']),
   size: z.array(z.string()).min(1, 'At least one size is required'),
   color: z.array(z.string()).min(1, 'At least one color is required'),
   is_public: z.boolean().default(false),
@@ -41,7 +40,7 @@ const productSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
-// Available categories for the select
+// Available categories for the select - ensure these match the database constraints
 const categories = [
   'shirts', 
   'pants', 
@@ -68,6 +67,7 @@ const ProductForm = ({
   initialValues,
   title = 'Add New Product'
 }: ProductFormProps) => {
+  
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>(
     initialValues?.images ? initialValues.images.map(img => img.url) : []
@@ -89,6 +89,8 @@ const ProductForm = ({
       shop_link: initialValues?.shop_link || '',
     }
   });
+  
+  
   
   // Handle file input change
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
