@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProducts } from '@/hooks/useProducts'; 
@@ -20,7 +21,7 @@ const TryOn = () => {
   const { user } = useAuth();
   const { products, fetchProducts } = useProducts();
   const { dynamicProducts } = useDynamicProducts();
-  const { isLoading, tryOn, result } = useTryOn();
+  const { isLoading, generateTryOn, currentResult } = useTryOn();
   
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modelImage, setModelImage] = useState<string | null>(null);
@@ -92,7 +93,7 @@ const TryOn = () => {
       return;
     }
     
-    await tryOn(modelImage, selectedProduct);
+    await generateTryOn(selectedProduct, {});
   };
   
   const handleModelSelect = (modelUrl: string) => {
@@ -167,14 +168,16 @@ const TryOn = () => {
               
               {/* TryOnCanvas or Result */}
               <div className="relative">
-                {result ? (
+                {currentResult && currentResult.success && currentResult.imageUrl ? (
                   <img 
-                    src={result} 
+                    src={currentResult.imageUrl} 
                     alt="Try On Result" 
                     className="w-full rounded-lg shadow-lg" 
                   />
                 ) : (
-                  <TryOnCanvas mainImage={selectedProduct.images?.main || ''} />
+                  <TryOnCanvas 
+                    product={selectedProduct} 
+                  />
                 )}
               </div>
             </div>

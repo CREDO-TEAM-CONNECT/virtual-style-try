@@ -3,12 +3,12 @@ import { useState } from 'react';
 import { Product } from '@/lib/products'; 
 import { supabase } from '@/integrations/supabase/client';
 
-type TryOnOptions = {
+export type TryOnOptions = {
   size?: string;
   color?: string;
 };
 
-type TryOnResult = {
+export type TryOnResult = {
   success: boolean;
   imageUrl?: string;
   error?: string;
