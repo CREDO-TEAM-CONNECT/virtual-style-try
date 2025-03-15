@@ -1,82 +1,111 @@
-
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useProducts } from '@/hooks/useProducts';
 import { useAuth } from '@/context/AuthContext';
-import { useProducts, Product } from '@/hooks/useProducts';
+import { SupabaseProduct } from '@/integrations/supabase/types';
+import { AddProductModal } from '@/components/AddProductModal';
+import { EditProductModal } from '@/components/EditProductModal';
+import { DeleteProductDialog } from '@/components/DeleteProductDialog';
+import ProductCardAdmin from '@/components/ProductCardAdmin';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import ProductForm from '@/components/ProductForm';
-import ProductCard from '@/components/ProductCard';
 import { Button } from '@/components/ui/button';
-import { Plus, Filter, Edit, Trash2, Eye } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Plus, Loader2, Package, Search } from 'lucide-react';
+import { toast } from 'sonner';
 
 const UserProducts = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const { products, isLoading, fetchProducts, createProduct, updateProduct, deleteProduct } = useProducts();
-  
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'public' | 'private'>('all');
+  const { user } = useAuth();
+  const { products, fetchProducts, addProduct, updateProduct, deleteProduct } = useProducts();
+  const [openAddProductModal, setOpenAddProductModal] = useState(false);
+  const [openEditProductModal, setOpenEditProductModal] = useState(false);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<SupabaseProduct | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   
   useEffect(() => {
-    if (!user) {
-      navigate('/auth');
+    if (user) {
+      fetchProducts(false)
+        .then(() => setIsLoading(false))
+        .catch(() => setIsLoading(false));
     } else {
-      fetchProducts(false); // Only fetch user's products
+      setIsLoading(false);
     }
-  }, [user]);
+  }, [user, fetchProducts]);
   
-  const handleCreateProduct = async (formValues: any, files: File[]) => {
-    await createProduct(formValues, files);
-  };
-  
-  const handleUpdateProduct = async (formValues: any, files: File[]) => {
-    if (editingProduct) {
-      await updateProduct(editingProduct.id, formValues);
-      setEditingProduct(null);
-    }
-  };
-  
-  const openEditForm = (product: Product) => {
-    setEditingProduct(product);
-    setFormOpen(true);
-  };
-  
-  const confirmDelete = (productId: string) => {
-    setProductToDelete(productId);
-    setDeleteConfirmOpen(true);
-  };
-  
-  const handleDelete = async () => {
-    if (productToDelete) {
-      await deleteProduct(productToDelete);
-      setDeleteConfirmOpen(false);
-      setProductToDelete(null);
+  const handleProductAdded = async (newProduct: SupabaseProduct) => {
+    try {
+      await addProduct(newProduct);
+      toast.success('Product added successfully!');
+    } catch (error) {
+      toast.error('Failed to add product.');
+    } finally {
+      setOpenAddProductModal(false);
     }
   };
   
-  const filteredProducts = filter === 'all' 
-    ? products 
-    : products.filter(p => filter === 'public' ? p.is_public : !p.is_public);
+  const handleEditProduct = (product: SupabaseProduct) => {
+    setSelectedProduct(product);
+    setOpenEditProductModal(true);
+  };
+  
+  const handleProductUpdated = async (updatedProduct: SupabaseProduct) => {
+    try {
+      if (!selectedProduct) {
+        toast.error('No product selected to update.');
+        return;
+      }
+      await updateProduct({ ...selectedProduct, ...updatedProduct });
+      toast.success('Product updated successfully!');
+    } catch (error) {
+      toast.error('Failed to update product.');
+    } finally {
+      setOpenEditProductModal(false);
+      setSelectedProduct(null);
+    }
+  };
+  
+  const handleDeleteProduct = (product: SupabaseProduct) => {
+    setSelectedProduct(product);
+    setOpenDeleteDialog(true);
+  };
+  
+  const confirmDeleteProduct = async () => {
+    if (!selectedProduct) {
+      toast.error('No product selected to delete.');
+      return;
+    }
+    
+    setIsDeleting(true);
+    try {
+      await deleteProduct(selectedProduct.id);
+      toast.success('Product deleted successfully!');
+    } catch (error) {
+      toast.error('Failed to delete product.');
+    } finally {
+      setOpenDeleteDialog(false);
+      setIsDeleting(false);
+      setSelectedProduct(null);
+    }
+  };
+  
+  const filteredProducts = products.filter(product => {
+    const searchRegex = new RegExp(searchTerm, 'i');
+    const categoryMatch = categoryFilter === 'all' || product.category === categoryFilter;
+    return searchRegex.test(product.name) && categoryMatch;
+  });
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -86,169 +115,150 @@ const UserProducts = () => {
         <div className="container mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl md:text-4xl font-semibold mb-2">
-                My Products
-              </h1>
-              <p className="text-gray-600 mb-4 md:mb-0">
-                Manage your clothing items and accessories
+              <h1 className="text-3xl md:text-4xl font-semibold mb-2">Your Products</h1>
+              <p className="text-gray-600">
+                Manage your clothing items for virtual try-on
               </p>
             </div>
-            
-            <div className="flex items-center gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2">
-                    <Filter size={16} /> 
-                    {filter === 'all' ? 'All Products' : 
-                     filter === 'public' ? 'Public Only' : 'Private Only'}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setFilter('all')}>
-                    All Products
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilter('public')}>
-                    Public Only
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilter('private')}>
-                    Private Only
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              
-              <Button onClick={() => {
-                setEditingProduct(null);
-                setFormOpen(true);
-              }} className="gap-2">
-                <Plus size={16} /> Add Product
-              </Button>
-            </div>
+            <Button 
+              onClick={() => setOpenAddProductModal(true)}
+              className="mt-4 md:mt-0 flex items-center gap-2"
+            >
+              <Plus size={18} />
+              Add New Product
+            </Button>
           </div>
           
           {isLoading ? (
-            <div className="flex justify-center my-12">
-              <div className="animate-pulse flex flex-col items-center">
-                <div className="h-12 w-12 rounded-full bg-gray-200 mb-4"></div>
-                <div className="h-4 w-48 bg-gray-200 rounded"></div>
-              </div>
+            <div className="flex justify-center items-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
             </div>
-          ) : filteredProducts.length === 0 ? (
-            <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
-              <p className="text-gray-500 mb-6">
-                {filter !== 'all' 
-                  ? `You don't have any ${filter} products yet.`
-                  : "You haven't created any products yet."}
+          ) : products.length === 0 ? (
+            <div className="text-center py-16 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="bg-white rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center shadow-sm">
+                <Package size={24} className="text-gray-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No products yet</h3>
+              <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                Add your first product to start creating virtual try-on experiences. You can upload both your own items and products from your favorite brands.
               </p>
               <Button 
-                onClick={() => {
-                  setEditingProduct(null);
-                  setFormOpen(true);
-                }}
-                className="gap-2"
+                onClick={() => setOpenAddProductModal(true)}
+                className="flex items-center gap-2 mx-auto"
               >
-                <Plus size={16} /> Create Your First Product
+                <Plus size={18} />
+                Add Your First Product
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredProducts.map(product => (
-                <div key={product.id} className="group relative animate-scale-in">
-                  <ProductCard 
-                    product={{
-                      id: product.id,
-                      name: product.name,
-                      brand: product.brand,
-                      price: product.price,
-                      description: product.description,
-                      // Map category to the correct type
-                      category: mapCategoryToProductType(product.category),
-                      size: product.size,
-                      color: product.color,
-                      shopLink: product.shop_link || '',
-                      images: {
-                        main: product.images?.find(img => img.type === 'main')?.url || '',
-                        gallery: product.images?.filter(img => img.type !== 'main').map(img => img.url) || []
-                      }
-                    }} 
-                  />
-                  
-                  {/* Admin actions overlay */}
-                  <div className="absolute inset-0 bg-black/70 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center items-center gap-4 p-6">
-                    <Link
-                      to={`/try-on/${product.id}`}
-                      className="w-full flex justify-center items-center gap-2 px-4 py-2 bg-white text-black rounded-full hover:bg-white/90 transition-colors"
-                    >
-                      <Eye size={18} /> Try On
-                    </Link>
-                    
-                    <Button 
-                      variant="outline"
-                      onClick={() => openEditForm(product)}
-                      className="w-full gap-2"
-                    >
-                      <Edit size={18} /> Edit
-                    </Button>
-                    
-                    <Button 
-                      variant="destructive"
-                      onClick={() => confirmDelete(product.id)}
-                      className="w-full gap-2"
-                    >
-                      <Trash2 size={18} /> Delete
-                    </Button>
+            <>
+              <Tabs defaultValue="all" className="mb-6">
+                <TabsList>
+                  <TabsTrigger value="all">All Products</TabsTrigger>
+                  <TabsTrigger value="public">Public</TabsTrigger>
+                  <TabsTrigger value="private">Private</TabsTrigger>
+                </TabsList>
+                <div className="mt-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        type="search"
+                        placeholder="Search products..."
+                        className="pl-10 w-full max-w-xs"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <SelectTrigger className="max-w-[200px]">
+                        <SelectValue placeholder="All Categories" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        <SelectItem value="shirts">Shirts</SelectItem>
+                        <SelectItem value="pants">Pants</SelectItem>
+                        <SelectItem value="dresses">Dresses</SelectItem>
+                        <SelectItem value="coats">Coats</SelectItem>
+                        <SelectItem value="shoes">Shoes</SelectItem>
+                        <SelectItem value="hats">Hats</SelectItem>
+                        <SelectItem value="accessories">Accessories</SelectItem>
+                        <SelectItem value="swimwear">Swimwear</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  
-                  {/* Visibility badge */}
-                  <div className="absolute top-4 left-4 px-2 py-1 text-xs font-medium bg-white/20 backdrop-blur-sm rounded-full">
-                    {product.is_public ? 'Public' : 'Private'}
-                  </div>
+                
+                  <TabsContent value="all" className="mt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                      {filteredProducts.map((product) => (
+                        <ProductCardAdmin 
+                          key={product.id} 
+                          product={product} 
+                          onEdit={() => handleEditProduct(product)}
+                          onDelete={() => handleDeleteProduct(product)}
+                          onTryOn={() => navigate(`/try-on/${product.id}`)}
+                        />
+                      ))}
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="public" className="mt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                      {filteredProducts.filter(p => p.is_public).map((product) => (
+                        <ProductCardAdmin 
+                          key={product.id} 
+                          product={product} 
+                          onEdit={() => handleEditProduct(product)}
+                          onDelete={() => handleDeleteProduct(product)}
+                          onTryOn={() => navigate(`/try-on/${product.id}`)}
+                        />
+                      ))}
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="private" className="mt-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                      {filteredProducts.filter(p => !p.is_public).map((product) => (
+                        <ProductCardAdmin 
+                          key={product.id} 
+                          product={product} 
+                          onEdit={() => handleEditProduct(product)}
+                          onDelete={() => handleDeleteProduct(product)}
+                          onTryOn={() => navigate(`/try-on/${product.id}`)}
+                        />
+                      ))}
+                    </div>
+                  </TabsContent>
                 </div>
-              ))}
-            </div>
+              </Tabs>
+            </>
           )}
         </div>
       </div>
       
-      <ProductForm 
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
-        initialValues={editingProduct || undefined}
-        title={editingProduct ? 'Edit Product' : 'Add New Product'}
+      <AddProductModal 
+        open={openAddProductModal} 
+        onClose={() => setOpenAddProductModal(false)}
+        onProductAdded={handleProductAdded}
       />
       
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the product and all associated data.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {selectedProduct && (
+        <EditProductModal 
+          open={openEditProductModal}
+          onClose={() => setOpenEditProductModal(false)}
+          product={selectedProduct}
+          onProductUpdated={handleProductUpdated}
+        />
+      )}
+      
+      <DeleteProductDialog
+        open={openDeleteDialog}
+        onClose={() => setOpenDeleteDialog(false)}
+        onConfirm={confirmDeleteProduct}
+        isDeleting={isDeleting}
+      />
       
       <Footer />
     </div>
   );
-};
-
-// Helper function to map database category to Product interface category
-const mapCategoryToProductType = (category: string): "tops" | "bottoms" | "dresses" | "outerwear" | "accessories" => {
-  switch (category) {
-    case "shirts": return "tops";
-    case "pants": return "bottoms";
-    case "dresses": return "dresses";
-    case "coats": return "outerwear";
-    default: return "accessories";
-  }
 };
 
 export default UserProducts;

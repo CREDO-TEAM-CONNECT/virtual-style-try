@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useGallery } from '@/context/GalleryContext';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, ShoppingBag } from 'lucide-react';
 import UserMenu from './UserMenu';
 
 const Navbar = () => {
@@ -33,7 +33,7 @@ const Navbar = () => {
     <header 
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled 
-          ? 'py-3 backdrop-blur-lg bg-white/80 shadow-subtle' 
+          ? 'py-3 backdrop-blur-lg bg-white/90 shadow-subtle' 
           : 'py-5 bg-transparent'
       }`}
     >
@@ -41,8 +41,9 @@ const Navbar = () => {
         {/* Logo */}
         <Link 
           to="/" 
-          className="text-xl font-medium tracking-tight"
+          className="text-xl font-medium tracking-tight flex items-center"
         >
+          <ShoppingBag size={24} className="mr-2" />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600">
             VIRTUFIT
           </span>
