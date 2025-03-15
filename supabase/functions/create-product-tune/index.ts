@@ -1,7 +1,8 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
+// CORS headers for browser requests
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -14,102 +15,105 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") as string;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") as string;
-    const astriaApiKey = Deno.env.get("ASTRIA_API_KEY") as string;
-    const astriaApiDomain = "https://api.astria.ai";
-
-    console.log("Product tune function started with URL:", supabaseUrl);
-    
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { productData, imageUrls } = await req.json();
-    
-    console.log("Request payload:", {
-      productId: productData.id,
-      name: productData.name,
-      category: productData.category,
-      imageCount: imageUrls.length
-    });
-    
-    // Log image URLs for debugging
-    console.log("Image URLs:", imageUrls);
-    
-    // Determine the clothing type name based on category
-    let clothingName = "clothing";
-    if (productData.category === "shirts") clothingName = "shirt";
-    else if (productData.category === "pants") clothingName = "pants";
-    else if (productData.category === "coats") clothingName = "coat";
-    else if (productData.category === "swimwear") clothingName = "swimming suit";
-    
-    // Make request to Astria API with clothing-specific parameters
-    const astriaPayload = {
-      tune: {
-        title: `clothing-${productData.id}`,
-        name: clothingName,
-        branch: "fast",
-        model_type: "lora",
-        base_tune_id: 1504944,  // Special clothing fine-tune base ID
-        image_urls: imageUrls,
-        callback: `${supabaseUrl}/functions/v1/product-callback`,
-      },
-    };
-    
-    console.log("Sending request to Astria API:", astriaPayload);
-    
-    const options = {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${astriaApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(astriaPayload),
-    };
-
-    console.log("Making request to:", `${astriaApiDomain}/tunes`);
-    
-    const response = await fetch(`${astriaApiDomain}/tunes`, options);
-    console.log("Response status:", response.status);
-    
-    const data = await response.json();
-    console.log("Response data:", data);
-
-    // Update product in database with initial response data
-    if (data && data.id) {
-      console.log("Updating product in database with tune ID:", data.id);
-      
-      await supabase
-        .from("products")
-        .update({
-          tune_id: data.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", productData.id);
-        
-      console.log("Database update completed");
-    } else {
-      console.log("No ID in response data, skipping database update");
+    // Get API key from environment
+    const ASTRIA_API_KEY = Deno.env.get("ASTRIA_API_KEY");
+    if (!ASTRIA_API_KEY) {
+      throw new Error("ASTRIA_API_KEY is not set");
     }
 
-    return new Response(
-      JSON.stringify(data),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          "Content-Type": "application/json" 
-        } 
-      }
-    );
+    // Get request data
+    const { productData, imageUrls } = await req.json();
+    
+    // Get auth token from request
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Missing Authorization header");
+    }
+    
+    // Create Supabase client with auth token
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    
+    // Main product image to use for the tune
+    const mainImageUrl = imageUrls[0];
+    if (!mainImageUrl) {
+      throw new Error("No product image provided");
+    }
+    
+    console.log("Creating product tune with image:", mainImageUrl);
+    
+    // Create a title for the tune that includes the product name and ID
+    const tuneTitle = `clothing_product_${productData.id.replace(/-/g, "_")}`;
+    
+    // For clothing items, use a different base tune ID (for clothes)
+    const response = await fetch("https://api.astria.ai/tunes", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${ASTRIA_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        "title": tuneTitle,
+        "image_urls": [mainImageUrl],
+        "base_tune_id": 1504944,
+        "model_type": "lora"
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Astria API error:", errorText);
+      throw new Error(`Failed to create product tune: ${errorText}`);
+    }
+    
+    const tuneData = await response.json();
+    console.log("Tune created:", tuneData);
+    
+    // Update the product with the tune ID
+    const { error: updateError } = await supabase
+      .from("products")
+      .update({ tune_id: tuneData.id })
+      .eq("id", productData.id);
+      
+    if (updateError) {
+      console.error("Error updating product with tune ID:", updateError);
+      throw new Error(`Failed to update product with tune ID: ${updateError.message}`);
+    }
+    
+    // Set up a callback URL for when the tuning is complete
+    const callbackEndpoint = `${supabaseUrl}/functions/v1/product-callback`;
+    console.log("Setting callback URL:", callbackEndpoint);
+    
+    const callbackResponse = await fetch(`https://api.astria.ai/tunes/${tuneData.id}/callback`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${ASTRIA_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        "url": callbackEndpoint,
+        "method": "POST"
+      }),
+    });
+    
+    if (!callbackResponse.ok) {
+      const callbackErrorText = await callbackResponse.text();
+      console.error("Failed to set callback:", callbackErrorText);
+      // This is not critical, so we'll just log the error and continue
+    }
+    
+    return new Response(JSON.stringify(tuneData), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
   } catch (error) {
-    console.error("Error creating product tune:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          "Content-Type": "application/json" 
-        },
-        status: 500 
-      }
-    );
+    console.error("Error in create-product-tune function:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });

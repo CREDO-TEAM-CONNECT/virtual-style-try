@@ -56,6 +56,9 @@ const Navbar = () => {
           <NavLink to="/try-on" active={location.pathname.includes('/try-on')}>
             Try On
           </NavLink>
+          <NavLink to="/products" active={location.pathname === '/products'}>
+            Products
+          </NavLink>
           <NavLink to="/models" active={location.pathname === '/models'}>
             My Models
           </NavLink>
@@ -99,6 +102,9 @@ const Navbar = () => {
             </MobileNavLink>
             <MobileNavLink to="/try-on" active={location.pathname.includes('/try-on')}>
               Try On
+            </MobileNavLink>
+            <MobileNavLink to="/products" active={location.pathname === '/products'}>
+              Products
             </MobileNavLink>
             <MobileNavLink to="/models" active={location.pathname === '/models'}>
               My Models

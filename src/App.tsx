@@ -1,44 +1,37 @@
+import React, { Suspense } from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { Toaster } from 'sonner';
+import { AuthProvider } from '@/context/AuthContext';
+import { GalleryProvider } from '@/context/GalleryContext';
+import Index from '@/pages/Index';
+import Auth from '@/pages/Auth';
+import Gallery from '@/pages/Gallery';
+import Models from '@/pages/Models';
+import NotFound from '@/pages/NotFound';
+import TryOn from '@/pages/TryOn';
+import UserProducts from '@/pages/UserProducts';
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { GalleryProvider } from "./context/GalleryContext";
-import { AuthProvider } from "./context/AuthContext";
-import Index from "./pages/Index";
-import TryOn from "./pages/TryOn";
-import Gallery from "./pages/Gallery";
-import Auth from "./pages/Auth";
-import Models from "./pages/Models";
-import UserProducts from "./pages/UserProducts";
-import NotFound from "./pages/NotFound";
-
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
+function App() {
+  return (
+    <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center">Loading...</div>}>
       <AuthProvider>
         <GalleryProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+          <Toaster position="top-center" richColors />
+          <Router>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/try-on" element={<TryOn />} />
-              <Route path="/try-on/:productId" element={<TryOn />} />
+              <Route path="/auth" element={<Auth />} />
               <Route path="/gallery" element={<Gallery />} />
               <Route path="/models" element={<Models />} />
               <Route path="/products" element={<UserProducts />} />
-              <Route path="/auth" element={<Auth />} />
+              <Route path="/try-on/:productId?" element={<TryOn />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
+          </Router>
         </GalleryProvider>
       </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </Suspense>
+  );
+}
 
 export default App;
