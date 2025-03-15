@@ -1,158 +1,103 @@
-
-import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { getProductById, products, Product } from '@/lib/products';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useProducts } from '@/hooks/useProducts'; 
 import { useDynamicProducts } from '@/hooks/useDynamicProducts';
-import TryOnCanvas from '@/components/TryOnCanvas';
-import ProductCard from '@/components/ProductCard';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, ChevronDown } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { Product } from '@/lib/products';
+import { useTryOn } from '@/hooks/useTryOn';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { supabase } from '@/integrations/supabase/client';
+import TryOnCanvas from '@/components/TryOnCanvas';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { toast } from 'sonner';
 
 const TryOn = () => {
-  const { productId } = useParams<{ productId: string }>();
-  const [product, setProduct] = useState<Product | null>(null);
-  const [selectedSize, setSelectedSize] = useState<string>('');
-  const [selectedColor, setSelectedColor] = useState<string>('');
-  const [sizeDropdownOpen, setSizeDropdownOpen] = useState(false);
-  const [colorDropdownOpen, setColorDropdownOpen] = useState(false);
-  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const { productId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { products, fetchProducts } = useProducts();
   const { dynamicProducts } = useDynamicProducts();
+  const { isLoading, tryOn, result } = useTryOn();
   
-  // Get product data when ID changes
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [modelImage, setModelImage] = useState<string | null>(null);
+  
+  // Fetch products on mount
   useEffect(() => {
-    const fetchProduct = async () => {
-      if (!productId) return;
-      
-      // Check if it's a UUID (user-created product)
-      if (productId.includes('-')) {
-        try {
-          // Fetch from database
-          const { data, error } = await supabase
-            .from('products')
-            .select('*, product_images(*)')
-            .eq('id', productId)
-            .single();
+    if (user) {
+      fetchProducts(true); // Get both user's products and public products
+    }
+  }, [user]);
+  
+  // Set selected product when productId changes or products load
+  useEffect(() => {
+    if (productId) {
+      // Find in user's products
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        // Map from database product to Product interface
+        const mainImage = product.images?.find(img => img.type === 'main')?.url || '';
+        const galleryImages = product.images
+          ?.filter(img => img.type !== 'main')
+          .map(img => img.url) || [];
           
-          if (error) throw error;
-          
-          // Transform to match Product interface
-          const mainImage = data.product_images.find((img: any) => img.type === 'main')?.url || '';
-          const additionalImages = data.product_images
-            .filter((img: any) => img.type !== 'main')
-            .map((img: any) => img.url);
-          
-          const userProduct: Product = {
-            id: data.id,
-            name: data.name,
-            brand: data.brand,
-            price: data.price,
-            description: data.description,
-            category: data.category,
-            size: data.size,
-            color: data.color,
-            shopLink: data.shop_link || '',
-            images: {
-              main: mainImage,
-              additional: additionalImages
-            }
-          };
-          
-          setProduct(userProduct);
-          setSelectedSize(userProduct.size[0]);
-          setSelectedColor(userProduct.color[0]);
-          
-          // Get related user-created products
-          const allProducts = [...products, ...dynamicProducts];
-          const related = allProducts
-            .filter(p => p.category === userProduct.category && p.id !== userProduct.id)
-            .slice(0, 3);
-          setRelatedProducts(related);
-        } catch (error) {
-          console.error('Error fetching user product:', error);
-          setProduct(null);
-        }
-      } else {
-        // It's a regular product from static data
-        const foundProduct = getProductById(productId);
-        if (foundProduct) {
-          setProduct(foundProduct);
-          // Set default selections
-          setSelectedSize(foundProduct.size[0]);
-          setSelectedColor(foundProduct.color[0]);
-          
-          // Get related products of the same category
-          const allProducts = [...products, ...dynamicProducts];
-          const related = allProducts
-            .filter(p => p.category === foundProduct.category && p.id !== foundProduct.id)
-            .slice(0, 3);
-          setRelatedProducts(related);
-        } else {
-          setProduct(null);
-        }
+        // Map database category to the expected enum values in Product interface
+        let mappedCategory: "tops" | "bottoms" | "dresses" | "outerwear" | "accessories" = "accessories";
+        if (product.category === "shirts") mappedCategory = "tops";
+        else if (product.category === "pants") mappedCategory = "bottoms";
+        else if (product.category === "dresses") mappedCategory = "dresses";
+        else if (product.category === "coats") mappedCategory = "outerwear";
+        
+        setSelectedProduct({
+          id: product.id,
+          name: product.name,
+          brand: product.brand,
+          price: product.price,
+          description: product.description,
+          category: mappedCategory,
+          size: product.size,
+          color: product.color,
+          shopLink: product.shop_link || '',
+          images: {
+            main: mainImage,
+            gallery: galleryImages,
+            model: undefined
+          }
+        });
+        return;
       }
-    };
-    
-    fetchProduct();
-  }, [productId, dynamicProducts]);
+      
+      // If not found in user's products, check dynamic products
+      const dynamicProduct = dynamicProducts.find(p => p.id === productId);
+      if (dynamicProduct) {
+        setSelectedProduct(dynamicProduct);
+        return;
+      }
+      
+      // If product not found, redirect to home
+      navigate('/');
+    }
+  }, [productId, products, dynamicProducts, navigate]);
   
-  // If no product ID is specified, show browsing page
-  if (!productId) {
-    // Combine static and dynamic products
-    const allProducts = [...products, ...dynamicProducts];
+  const handleTryOn = async () => {
+    if (!selectedProduct) {
+      toast.error('Please select a product');
+      return;
+    }
+    if (!modelImage) {
+      toast.error('Please select a model');
+      return;
+    }
     
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        
-        <div className="flex-1 pt-32 pb-20 px-4">
-          <div className="container mx-auto">
-            <h1 className="text-3xl md:text-4xl font-semibold mb-2">
-              Browse Collection
-            </h1>
-            <p className="text-gray-600 mb-12">
-              Select an item to try on virtually
-            </p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {allProducts.map(product => (
-                <div key={product.id} className="animate-scale-in">
-                  <ProductCard product={product} />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        
-        <Footer />
-      </div>
-    );
-  }
+    await tryOn(modelImage, selectedProduct);
+  };
   
-  // Product not found
-  if (!product) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        
-        <div className="flex-1 pt-32 pb-20 px-4 flex flex-col items-center justify-center">
-          <h1 className="text-2xl font-medium mb-4">Product Not Found</h1>
-          <p className="text-gray-600 mb-6">
-            The product you're looking for doesn't exist or has been removed.
-          </p>
-          <Link to="/try-on">
-            <Button variant="outline">
-              Browse Collection
-            </Button>
-          </Link>
-        </div>
-        
-        <Footer />
-      </div>
-    );
-  }
+  const handleModelSelect = (modelUrl: string) => {
+    setModelImage(modelUrl);
+  };
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -160,133 +105,85 @@ const TryOn = () => {
       
       <div className="flex-1 pt-28 pb-20 px-4">
         <div className="container mx-auto">
-          {/* Back button */}
-          <Link 
-            to="/try-on" 
-            className="inline-flex items-center text-sm font-medium mb-8 hover:text-gray-800 transition-colors"
-          >
-            <ArrowLeft size={16} className="mr-2" />
-            Back to Collection
-          </Link>
+          <h1 className="text-3xl md:text-4xl font-semibold mb-8">
+            Try On
+          </h1>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-20">
-            {/* Try-on Canvas */}
-            <div>
-              <TryOnCanvas 
-                product={product} 
-                selectedSize={selectedSize}
-                selectedColor={selectedColor}
-              />
-            </div>
-            
-            {/* Product Details */}
-            <div className="flex flex-col">
-              <div className="mb-2 text-sm font-medium text-gray-500">
-                {product.brand}
-              </div>
-              <h1 className="text-3xl font-semibold mb-2">
-                {product.name}
-              </h1>
-              <div className="text-xl mb-6">
-                ${product.price.toFixed(2)}
-              </div>
-              
-              <p className="text-gray-600 mb-8">
-                {product.description}
-              </p>
-              
-              {/* Size Selection */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Size</span>
-                  <span className="text-xs text-gray-500">
-                    {selectedSize}
-                  </span>
-                </div>
-                <div className="relative">
-                  <button
-                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg text-left"
-                    onClick={() => setSizeDropdownOpen(!sizeDropdownOpen)}
+          {selectedProduct ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Product Details */}
+              <div>
+                <div className="mb-6">
+                  <h2 className="text-2xl font-semibold mb-2">{selectedProduct.name}</h2>
+                  <p className="text-gray-600">{selectedProduct.description}</p>
+                  <p className="text-xl font-semibold mt-2">${selectedProduct.price}</p>
+                  <a 
+                    href={selectedProduct.shopLink} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-block mt-4 text-blue-500 hover:underline"
                   >
-                    <span>{selectedSize}</span>
-                    <ChevronDown size={16} className={`transition-transform ${sizeDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {sizeDropdownOpen && (
-                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden animate-fade-in">
-                      {product.size.map(size => (
-                        <button
-                          key={size}
-                          className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
-                            selectedSize === size ? 'bg-gray-50 font-medium' : ''
-                          }`}
-                          onClick={() => {
-                            setSelectedSize(size);
-                            setSizeDropdownOpen(false);
-                          }}
-                        >
-                          {size}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                    View in Shop
+                  </a>
                 </div>
-              </div>
-              
-              {/* Color Selection */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Color</span>
-                  <span className="text-xs text-gray-500">
-                    {selectedColor}
-                  </span>
-                </div>
-                <div className="relative">
-                  <button
-                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg text-left"
-                    onClick={() => setColorDropdownOpen(!colorDropdownOpen)}
-                  >
-                    <span>{selectedColor}</span>
-                    <ChevronDown size={16} className={`transition-transform ${colorDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  
-                  {colorDropdownOpen && (
-                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden animate-fade-in">
-                      {product.color.map(color => (
-                        <button
-                          key={color}
-                          className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
-                            selectedColor === color ? 'bg-gray-50 font-medium' : ''
-                          }`}
-                          onClick={() => {
-                            setSelectedColor(color);
-                            setColorDropdownOpen(false);
-                          }}
-                        >
-                          {color}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Related Products */}
-          {relatedProducts.length > 0 && (
-            <div>
-              <h2 className="text-2xl font-semibold mb-6">
-                You May Also Like
-              </h2>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {relatedProducts.map(product => (
-                  <div key={product.id} className="animate-scale-in">
-                    <ProductCard product={product} />
+                
+                {/* Model Selection */}
+                <div className="mb-6">
+                  <h3 className="text-xl font-semibold mb-2">Select a Model</h3>
+                  <div className="flex gap-4 overflow-x-auto">
+                    <button 
+                      onClick={() => handleModelSelect("https://pbxt.replicate.delivery/urn:ads:replicate:9yd4r-4z4efl-44z7lnrz3fehfu77xm7rbq7odjrbgt4wb2ora64@https://replicate.delivery/pbxt/9yd4r-4z4efl-44z7lnrz3fehfu77xm7rbq7odjrbgt4wb2ora64/output.png")}
+                      className={`w-24 h-32 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 ${modelImage === "https://pbxt.replicate.delivery/urn:ads:replicate:9yd4r-4z4efl-44z7lnrz3fehfu77xm7rbq7odjrbgt4wb2ora64@https://replicate.delivery/pbxt/9yd4r-4z4efl-44z7lnrz3fehfu77xm7rbq7odjrbgt4wb2ora64/output.png" ? 'ring-2 ring-primary' : ''}`}
+                    >
+                      <img 
+                        src="https://pbxt.replicate.delivery/urn:ads:replicate:9yd4r-4z4efl-44z7lnrz3fehfu77xm7rbq7odjrbgt4wb2ora64@https://replicate.delivery/pbxt/9yd4r-4z4efl-44z7lnrz3fehfu77xm7rbq7odjrbgt4wb2ora64/output.png" 
+                        alt="Model 1" 
+                        className="w-full h-full object-cover" 
+                      />
+                    </button>
+                    <button 
+                      onClick={() => handleModelSelect("https://pbxt.replicate.delivery/urn:ads:replicate:5xl4x-5v4vd7-4dg7ln6v6vb44y5qczauf7dt3cz47w46dtm4@https://replicate.delivery/pbxt/5xl4x-5v4vd7-4dg7ln6v6vb44y5qczauf7dt3cz47w46dtm4/output.png")}
+                      className={`w-24 h-32 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 ${modelImage === "https://pbxt.replicate.delivery/urn:ads:replicate:5xl4x-5v4vd7-4dg7ln6v6vb44y5qczauf7dt3cz47w46dtm4@https://replicate.delivery/pbxt/5xl4x-5v4vd7-4dg7ln6v6vb44y5qczauf7dt3cz47w46dtm4/output.png" ? 'ring-2 ring-primary' : ''}`}
+                    >
+                      <img 
+                        src="https://pbxt.replicate.delivery/urn:ads:replicate:5xl4x-5v4vd7-4dg7ln6v6vb44y5qczauf7dt3cz47w46dtm4@https://replicate.delivery/pbxt/5xl4x-5v4vd7-4dg7ln6v6vb44y5qczauf7dt3cz47w46dtm4/output.png" 
+                        alt="Model 2" 
+                        className="w-full h-full object-cover" 
+                      />
+                    </button>
+                    {/* Add more models here */}
                   </div>
-                ))}
+                </div>
+                
+                {/* Try On Button */}
+                <Button 
+                  onClick={handleTryOn}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  {isLoading ? 'Trying On...' : 'Try On'}
+                </Button>
               </div>
+              
+              {/* TryOnCanvas or Result */}
+              <div className="relative">
+                {result ? (
+                  <img 
+                    src={result} 
+                    alt="Try On Result" 
+                    className="w-full rounded-lg shadow-lg" 
+                  />
+                ) : (
+                  <TryOnCanvas mainImage={selectedProduct.images?.main || ''} />
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-16">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No product selected</h3>
+              <p className="text-gray-500 mb-6">
+                Select a product to see it on a model.
+              </p>
             </div>
           )}
         </div>

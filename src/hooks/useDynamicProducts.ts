@@ -21,11 +21,18 @@ export const useDynamicProducts = () => {
       
       // Transform to match the Product interface
       const transformedProducts: Product[] = data.map(product => {
-        // Find main image and additional images
+        // Find main image and additional images for gallery
         const mainImage = product.product_images.find((img: any) => img.type === 'main')?.url || '';
-        const additionalImages = product.product_images
+        const galleryImages = product.product_images
           .filter((img: any) => img.type !== 'main')
           .map((img: any) => img.url);
+        
+        // Map database category to the expected enum values in Product interface
+        let mappedCategory: "tops" | "bottoms" | "dresses" | "outerwear" | "accessories" = "accessories";
+        if (product.category === "shirts") mappedCategory = "tops";
+        else if (product.category === "pants") mappedCategory = "bottoms";
+        else if (product.category === "dresses") mappedCategory = "dresses";
+        else if (product.category === "coats") mappedCategory = "outerwear";
         
         return {
           id: product.id,
@@ -33,13 +40,14 @@ export const useDynamicProducts = () => {
           brand: product.brand,
           price: product.price,
           description: product.description,
-          category: product.category,
+          category: mappedCategory,
           size: product.size,
           color: product.color,
           shopLink: product.shop_link || '',
           images: {
             main: mainImage,
-            additional: additionalImages
+            gallery: galleryImages,
+            model: undefined
           }
         };
       });

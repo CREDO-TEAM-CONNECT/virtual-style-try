@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -154,7 +153,24 @@ const UserProducts = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredProducts.map(product => (
                 <div key={product.id} className="group relative animate-scale-in">
-                  <ProductCard product={product} />
+                  <ProductCard 
+                    product={{
+                      id: product.id,
+                      name: product.name,
+                      brand: product.brand,
+                      price: product.price,
+                      description: product.description,
+                      // Map category to the correct type
+                      category: mapCategoryToProductType(product.category),
+                      size: product.size,
+                      color: product.color,
+                      shopLink: product.shop_link || '',
+                      images: {
+                        main: product.images?.find(img => img.type === 'main')?.url || '',
+                        gallery: product.images?.filter(img => img.type !== 'main').map(img => img.url) || []
+                      }
+                    }} 
+                  />
                   
                   {/* Admin actions overlay */}
                   <div className="absolute inset-0 bg-black/70 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center items-center gap-4 p-6">
@@ -221,6 +237,17 @@ const UserProducts = () => {
       <Footer />
     </div>
   );
+};
+
+// Helper function to map database category to Product interface category
+const mapCategoryToProductType = (category: string): "tops" | "bottoms" | "dresses" | "outerwear" | "accessories" => {
+  switch (category) {
+    case "shirts": return "tops";
+    case "pants": return "bottoms";
+    case "dresses": return "dresses";
+    case "coats": return "outerwear";
+    default: return "accessories";
+  }
 };
 
 export default UserProducts;
