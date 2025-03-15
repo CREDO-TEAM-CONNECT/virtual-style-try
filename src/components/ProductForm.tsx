@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -50,7 +51,9 @@ const categories = [
   'hats',
   'accessories',
   'swimwear'
-];
+] as const; // Make this a const array to ensure type safety
+
+type CategoryType = typeof categories[number]; // Create a type from the array values
 
 interface ProductFormProps {
   open: boolean;
@@ -75,6 +78,7 @@ const ProductForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Initialize form with default values or passed values
+  // Ensure category is properly typed as one of the allowed values
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -82,7 +86,7 @@ const ProductForm = ({
       description: initialValues?.description || '',
       brand: initialValues?.brand || '',
       price: initialValues?.price || 0,
-      category: initialValues?.category || categories[0],
+      category: (initialValues?.category as CategoryType) || categories[0],
       size: initialValues?.size || ['S', 'M', 'L'],
       color: initialValues?.color || ['Black'],
       is_public: initialValues?.is_public || false,
